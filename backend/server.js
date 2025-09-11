@@ -25,6 +25,7 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json({ limit: "10mb" })); // allows you to parse the body of the request
 app.use(cookieParser());
+app.use(express.static(path.join(__dirname, "public")));
 // Add this BEFORE your routes
 
 app.use((req, res, next) => {
@@ -47,8 +48,9 @@ app.use("/api/cart", cartRoutes);
 app.use("/api/coupons", couponRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/analytics", analyticsRoutes);
-
-
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "../public/index.html"));
+});
 
 app.listen(PORT, () => {
 	console.log("Server is running on http://localhost:" + PORT);
