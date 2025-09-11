@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const axiosInstance = axios.create({
-	baseURL: import.meta.mode === "development" ? "http://localhost:3000/api" : "/api",
+	baseURL: import.meta.mode === "development" ? "https://e-commerce-plqu.onrender.com/api" : "/api",
 	withCredentials: true, // send cookies to the server
 });
 
