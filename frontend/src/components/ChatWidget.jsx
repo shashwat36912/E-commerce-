@@ -101,7 +101,7 @@ const ChatWidget = ({ open, onClose }) => {
 
     return (
       <div className="p-2 border rounded bg-emerald-50 flex items-center gap-2">
-        {product.image && <img src={product.image} alt={product.name} className="w-16 h-16 object-cover rounded" />}
+  {product.image && <img loading="lazy" src={product.image} alt={product.name} className="w-16 h-16 object-cover rounded" />}
         <div className="flex-1">
           <div className="font-semibold">{product.name}</div>
           <div className="text-sm">Price: ${product.price}</div>

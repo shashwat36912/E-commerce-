@@ -3,8 +3,8 @@ import { Link } from "react-router-dom";
 import { useUserStore } from "../stores/useUserStore";
 import { useCartStore } from "../stores/useCartStore";
 import { useClerk } from "@clerk/clerk-react";
-import { useState } from 'react';
-import ChatWidget from './ChatWidget';
+import { useState, Suspense, lazy } from 'react';
+const ChatWidget = lazy(() => import('./ChatWidget'));
 
 const Navbar = () => {
 	const [chatOpen, setChatOpen] = useState(false);
@@ -88,7 +88,9 @@ const Navbar = () => {
 							</>
 						)}
 					</nav>
-					<ChatWidget open={chatOpen} onClose={() => setChatOpen(false)} />
+					<Suspense fallback={null}>
+						{chatOpen && <ChatWidget open={chatOpen} onClose={() => setChatOpen(false)} />}
+					</Suspense>
 				</div>
 			</div>
 		</header>
