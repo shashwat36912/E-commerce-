@@ -7,7 +7,7 @@ export const useUserStore = create((set, get) => ({
 	loading: false,
 	checkingAuth: true,
 
-	signup: async ({ name, email, password, confirmPassword }) => {
+	signup: async ({ name, email, phone, password, confirmPassword }) => {
 		set({ loading: true });
 
 		if (password !== confirmPassword) {
@@ -20,7 +20,7 @@ export const useUserStore = create((set, get) => ({
 			set({ user: res.data, loading: false });
 		} catch (error) {
 			set({ loading: false });
-			toast.error(error.response.data.message || "An error occurred");
+			toast.error(error.response?.data?.message || error.message || "An error occurred");
 		}
 	},
 	login: async (email, password) => {
@@ -32,9 +32,11 @@ export const useUserStore = create((set, get) => ({
 			set({ user: res.data, loading: false });
 		} catch (error) {
 			set({ loading: false });
-			toast.error(error.response.data.message || "An error occurred");
+			toast.error(error.response?.data?.message || error.message || "An error occurred");
 		}
 	},
+
+
 
 	logout: async () => {
 		try {
@@ -53,6 +55,19 @@ export const useUserStore = create((set, get) => ({
 		} catch (error) {
 			console.log(error.message);
 			set({ checkingAuth: false, user: null });
+		}
+	},
+
+	// Update current user's profile
+	updateProfile: async (updates) => {
+		set({ loading: true });
+		try {
+			const res = await axios.put('/auth/profile', updates);
+			set({ user: res.data.user || res.data, loading: false });
+			toast.success(res.data.message || 'Profile updated');
+		} catch (error) {
+			set({ loading: false });
+			toast.error(error.response?.data?.message || 'Failed to update profile');
 		}
 	},
 

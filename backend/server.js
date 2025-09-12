@@ -24,6 +24,25 @@ const __dirname = path.dirname(__filename);
 app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser());
 
+// CORS middleware for development: allow frontend dev server to access API with credentials
+app.use((req, res, next) => {
+  const allowedOrigin = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
+  res.header("Access-Control-Allow-Origin", allowedOrigin);
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.header(
+    "Access-Control-Allow-Headers",
+    "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+  );
+  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+
+  // Handle preflight
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+
+  next();
+});
+
 // Serve static files depending on environment
 if (process.env.NODE_ENV === "production") {
   // In production, serve the built frontend

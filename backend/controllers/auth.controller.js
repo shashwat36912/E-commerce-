@@ -15,21 +15,21 @@ const generateTokens = (userId) => {
 };
 
 const storeRefreshToken = async (userId, refreshToken) => {
-	await redis.set(`refresh_token:${userId}`, refreshToken, "EX", 7 * 24 * 60 * 60); // 7days
+	await redis.set(`refresh_token:${userId}`, refreshToken, "EX", 7 * 24 * 60 * 60);
 };
 
 const setCookies = (res, accessToken, refreshToken) => {
 	res.cookie("accessToken", accessToken, {
-		httpOnly: true, // prevent XSS attacks, cross site scripting attack
+		httpOnly: true,
 		secure: process.env.NODE_ENV === "production",
-		sameSite: "strict", // prevents CSRF attack, cross-site request forgery attack
-		maxAge: 15 * 60 * 1000, // 15 minutes
+		sameSite: "strict",
+		maxAge: 15 * 60 * 1000,
 	});
 	res.cookie("refreshToken", refreshToken, {
-		httpOnly: true, // prevent XSS attacks, cross site scripting attack
+		httpOnly: true,
 		secure: process.env.NODE_ENV === "production",
-		sameSite: "strict", // prevents CSRF attack, cross-site request forgery attack
-		maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+		sameSite: "strict",
+		maxAge: 7 * 24 * 60 * 60 * 1000,
 	});
 };
 
@@ -43,7 +43,6 @@ export const signup = async (req, res) => {
 		}
 		const user = await User.create({ name, email, password });
 
-		// authenticate
 		const { accessToken, refreshToken } = generateTokens(user._id);
 		await storeRefreshToken(user._id, refreshToken);
 
@@ -103,7 +102,6 @@ export const logout = async (req, res) => {
 	}
 };
 
-// this will refresh the access token
 export const refreshToken = async (req, res) => {
 	try {
 		const refreshToken = req.cookies.refreshToken;
@@ -140,5 +138,32 @@ export const getProfile = async (req, res) => {
 		res.json(req.user);
 	} catch (error) {
 		res.status(500).json({ message: "Server error", error: error.message });
+	}
+};
+
+export const updateUser = async (req, res) => {
+	try {
+		const userId = req.user?._id;
+		if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+
+		const allowedFields = ['name', 'email', 'password'];
+		const updates = {};
+		for (const key of Object.keys(req.body)) {
+			if (allowedFields.includes(key)) updates[key] = req.body[key];
+		}
+
+		let user = await User.findById(userId);
+		if (!user) return res.status(404).json({ message: 'User not found' });
+
+		Object.assign(user, updates);
+		await user.save();
+
+		const safeUser = user.toObject();
+		delete safeUser.password;
+
+		res.status(200).json({ message: 'User updated successfully', user: safeUser });
+	} catch (error) {
+		console.log('Error in updateUser controller', error.message);
+		res.status(500).json({ message: 'Error updating user', error: error.message });
 	}
 };

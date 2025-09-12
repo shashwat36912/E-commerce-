@@ -82,6 +82,8 @@ const SignUpPage = () => {
 							</div>
 						</div>
 
+            
+
 						<div>
 							<label htmlFor='password' className='block text-sm font-medium text-gray-300'>
 								Password
@@ -147,7 +149,7 @@ const SignUpPage = () => {
 					</form>
 
 					<p className='mt-8 text-center text-sm text-gray-400'>
-						Already have an account?{" "}
+						Already have an account? {" "}
 						<Link to='/login' className='font-medium text-emerald-400 hover:text-emerald-300'>
 							Login here <ArrowRight className='inline h-4 w-4' />
 						</Link>
