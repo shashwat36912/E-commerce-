@@ -13,6 +13,7 @@ import analyticsRoutes from "./routes/analytics.route.js";
 import adminRoutes from "./routes/admin.route.js";
 import orderRoutes from "./routes/order.route.js";
 import feedbackRoutes from "./routes/feedback.route.js";
+import aiRoutes from "./routes/ai.route.js";
 import connectDB from "./lib/db.js";
 
 dotenv.config();
@@ -109,6 +110,8 @@ async function init() {
   app.use("/api/admin", adminRoutes);
   app.use("/api/orders", orderRoutes);
   app.use("/api/feedbacks", feedbackRoutes);
+  // AI endpoints for chat and recommendations
+  app.use("/api/ai", aiRoutes);
 
   // Fallback to index.html for client-side routing
   app.get("*", (req, res) => {

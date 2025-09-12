@@ -3,8 +3,11 @@ import { Link } from "react-router-dom";
 import { useUserStore } from "../stores/useUserStore";
 import { useCartStore } from "../stores/useCartStore";
 import { useClerk } from "@clerk/clerk-react";
+import { useState } from 'react';
+import ChatWidget from './ChatWidget';
 
 const Navbar = () => {
+	const [chatOpen, setChatOpen] = useState(false);
 	const { user, clearUser } = useUserStore();
 	// Support both new `isAdmin` boolean and legacy `role === 'admin'` field
 	const isAdmin = Boolean(user?.isAdmin) || user?.role === "admin";
@@ -20,6 +23,7 @@ const Navbar = () => {
 					</Link>
 
 					<nav className='flex flex-wrap items-center gap-4'>
+						<button onClick={() => setChatOpen(true)} className='text-gray-300 hover:text-emerald-400 transition duration-300 px-2 py-1 rounded'>Help</button>
 						{/* Home button (explicit) */}
 						<Link to={'/'} className='text-gray-300 hover:text-emerald-400 transition duration-300 ease-in-out flex items-center'>
 							<Home className='inline-block mr-1' size={18} />
@@ -84,6 +88,7 @@ const Navbar = () => {
 							</>
 						)}
 					</nav>
+					<ChatWidget open={chatOpen} onClose={() => setChatOpen(false)} />
 				</div>
 			</div>
 		</header>
