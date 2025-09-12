@@ -6,6 +6,7 @@ import LoginPage from "./pages/LoginPage";
 import AdminPage from "./pages/AdminPage";
 import CategoryPage from "./pages/CategoryPage";
 import ProfilePage from "./pages/ProfilePage";
+import MoreDetails from "./pages/MoreDetails";
 
 import Navbar from "./components/Navbar";
 import { Toaster } from "react-hot-toast";
@@ -57,6 +58,7 @@ function App() {
 						element={(Boolean(user?.isAdmin) || user?.role === "admin") ? <AdminPage /> : <Navigate to='/sign-in' />}
 					/>
 					<Route path='/category/:category' element={<CategoryPage />} />
+					<Route path='/product/:id' element={<MoreDetails />} />
 					{/* Allow viewing cart even when not signed in (user can sign in at checkout) */}
 					<Route path='/cart' element={<CartPage />} />
 					<Route
