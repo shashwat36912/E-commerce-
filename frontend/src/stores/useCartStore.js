@@ -2,6 +2,31 @@ import { create } from "zustand";
 import axios from "../lib/axios";
 import { toast } from "react-hot-toast";
 
+const LOCAL_CART_KEY = "local_cart_v1";
+
+function saveCartToLocal(cart) {
+	try {
+		if (typeof window !== "undefined" && window.localStorage) {
+			window.localStorage.setItem(LOCAL_CART_KEY, JSON.stringify(cart || []));
+		}
+	} catch (e) {
+		
+	}
+}
+
+function loadCartFromLocal() {
+	try {
+		if (typeof window !== "undefined" && window.localStorage) {
+			const raw = window.localStorage.getItem(LOCAL_CART_KEY);
+			if (!raw) return [];
+			return JSON.parse(raw);
+		}
+	} catch (e) {
+		// ignore
+	}
+	return [];
+}
+
 export const useCartStore = create((set, get) => ({
 	cart: [],
 	coupon: null,
@@ -36,55 +61,130 @@ export const useCartStore = create((set, get) => ({
 	getCartItems: async () => {
 		try {
 			const res = await axios.get("/cart");
-			set({ cart: res.data });
+			// Backend returns items as [{ product: {...}, quantity }] when populated.
+			// Normalize to frontend expected shape: { _id, name, price, image, quantity, ... }
+			const normalized = (res.data || []).map((item) => {
+				if (item && item.product) {
+					const p = item.product;
+					return {
+						...p,
+						_id: p._id || p.id,
+						quantity: item.quantity || 1,
+					};
+				}
+				// Already in flat shape (e.g., local optimistic updates)
+				return {
+					...item,
+					_id: item._id || item.id,
+					quantity: item.quantity || 1,
+				};
+			});
+			set({ cart: normalized });
 			get().calculateTotals();
+			// persist copy for guests
+			saveCartToLocal(normalized);
 		} catch (error) {
+			// If the request fails due to unauthenticated user or network
+			// fallback to localStorage-stored cart so guests can still see items
+			const status = error?.response?.status;
+			if (status === 401 || !error?.response) {
+				const local = loadCartFromLocal();
+				set({ cart: local });
+				get().calculateTotals();
+				return;
+			}
 			set({ cart: [] });
-			toast.error(error.response.data.message || "An error occurred");
+			toast.error(error.response?.data?.message || "An error occurred");
 		}
 	},
 	clearCart: async () => {
 		set({ cart: [], coupon: null, total: 0, subtotal: 0 });
+		try {
+			// best-effort server clear for authenticated users
+			await axios.delete(`/cart`);
+		} catch (e) {
+			// ignore server errors for guests
+		}
+		saveCartToLocal([]);
 	},
 	addToCart: async (product) => {
 		try {
 			await axios.post("/cart", { productId: product._id });
 			toast.success("Product added to cart");
-
-			set((prevState) => {
-				const existingItem = prevState.cart.find((item) => item._id === product._id);
-				const newCart = existingItem
-					? prevState.cart.map((item) =>
-							item._id === product._id ? { ...item, quantity: item.quantity + 1 } : item
-					  )
-					: [...prevState.cart, { ...product, quantity: 1 }];
-				return { cart: newCart };
-			});
-			get().calculateTotals();
+			// Refresh from server to get consistent shapes
+			await get().getCartItems();
 		} catch (error) {
-			toast.error(error.response.data.message || "An error occurred");
+			const status = error?.response?.status;
+			if (status === 401 || !error?.response) {
+				// Fallback: perform a local optimistic update for guest
+				const current = get().cart || [];
+				const idx = current.findIndex((c) => c._id === product._id);
+				let updated;
+				if (idx > -1) {
+					updated = current.map((c, i) => (i === idx ? { ...c, quantity: (c.quantity || 1) + 1 } : c));
+				} else {
+					updated = [...current, { ...product, _id: product._id || product.id, quantity: 1 }];
+				}
+				set({ cart: updated });
+				get().calculateTotals();
+				saveCartToLocal(updated);
+				toast.success("Product added to cart");
+				return;
+			}
+			toast.error(error.response?.data?.message || "An error occurred");
 		}
 	},
 	removeFromCart: async (productId) => {
-		await axios.delete(`/cart`, { data: { productId } });
-		set((prevState) => ({ cart: prevState.cart.filter((item) => item._id !== productId) }));
-		get().calculateTotals();
+		try {
+			await axios.delete(`/cart`, { data: { productId } });
+			// Refresh from server
+			await get().getCartItems();
+		} catch (error) {
+			const status = error?.response?.status;
+			if (status === 401 || !error?.response) {
+				const current = get().cart || [];
+				const updated = current.filter((i) => i._id !== productId);
+				set({ cart: updated });
+				get().calculateTotals();
+				saveCartToLocal(updated);
+				return;
+			}
+			toast.error(error.response?.data?.message || "An error occurred");
+		}
 	},
 	updateQuantity: async (productId, quantity) => {
 		if (quantity === 0) {
-			get().removeFromCart(productId);
+			await get().removeFromCart(productId);
 			return;
 		}
 
-		await axios.put(`/cart/${productId}`, { quantity });
-		set((prevState) => ({
-			cart: prevState.cart.map((item) => (item._id === productId ? { ...item, quantity } : item)),
-		}));
-		get().calculateTotals();
+		try {
+			await axios.put(`/cart/${productId}`, { quantity });
+			// Refresh for consistency
+			await get().getCartItems();
+		} catch (error) {
+			const status = error?.response?.status;
+			if (status === 401 || !error?.response) {
+				const current = get().cart || [];
+				const updated = current.map((c) => (c._id === productId ? { ...c, quantity } : c));
+				set({ cart: updated });
+				get().calculateTotals();
+				saveCartToLocal(updated);
+				return;
+			}
+			toast.error(error.response?.data?.message || "An error occurred");
+		}
 	},
 	calculateTotals: () => {
 		const { cart, coupon } = get();
-		const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+		const subtotal = cart.reduce((sum, item) => {
+			let price = item.price;
+			if (typeof price === "string") {
+				price = parseFloat(price.replace(/[^0-9.-]+/g, ""));
+			}
+			price = Number(price) || 0;
+			return sum + price * (item.quantity || 1);
+		}, 0);
 		let total = subtotal;
 
 		if (coupon) {

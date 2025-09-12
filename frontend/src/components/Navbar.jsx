@@ -2,10 +2,13 @@ import { ShoppingCart, UserPlus, LogIn, LogOut, Lock, User, Home } from "lucide-
 import { Link } from "react-router-dom";
 import { useUserStore } from "../stores/useUserStore";
 import { useCartStore } from "../stores/useCartStore";
+import { useClerk } from "@clerk/clerk-react";
 
 const Navbar = () => {
-	const { user, logout } = useUserStore();
-	const isAdmin = user?.role === "admin";
+	const { user, clearUser } = useUserStore();
+	// Support both new `isAdmin` boolean and legacy `role === 'admin'` field
+	const isAdmin = Boolean(user?.isAdmin) || user?.role === "admin";
+	const { signOut } = useClerk();
 	const { cart } = useCartStore();
 
 	return (
@@ -22,15 +25,17 @@ const Navbar = () => {
 							<Home className='inline-block mr-1' size={18} />
 							<span className='hidden sm:inline'>Home</span>
 						</Link>
-						<Link to={'/cart'} className='relative group flex items-center text-gray-300 hover:text-emerald-400 transition duration-300 ease-in-out'>
-							<ShoppingCart className='inline-block mr-1' size={20} />
-							<span className='hidden sm:inline'>Cart</span>
-							{cart?.length > 0 && (
-								<span className='absolute -top-2 -left-2 bg-emerald-500 text-white rounded-full px-2 py-0.5 text-xs'>
-									{cart.length}
-								</span>
-							)}
-						</Link>
+						{!isAdmin && (
+							<Link to={'/cart'} className='relative group flex items-center text-gray-300 hover:text-emerald-400 transition duration-300 ease-in-out'>
+								<ShoppingCart className='inline-block mr-1' size={20} />
+								<span className='hidden sm:inline'>Cart</span>
+								{cart?.length > 0 && (
+									<span className='absolute -top-2 -left-2 bg-emerald-500 text-white rounded-full px-2 py-0.5 text-xs'>
+										{cart.length}
+									</span>
+								)}
+							</Link>
+						)}
 
 						{isAdmin && (
 							<Link
@@ -54,7 +59,7 @@ const Navbar = () => {
 
 								<button
 									className='bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-md flex items-center transition duration-300 ease-in-out'
-									onClick={logout}
+									onClick={async () => { await signOut(); clearUser(); }}
 								>
 									<LogOut size={18} />
 									<span className='hidden sm:inline ml-2'>Log Out</span>
@@ -63,14 +68,14 @@ const Navbar = () => {
 						) : (
 							<>
 								<Link
-									to={'/signup'}
+									to={'/sign-up'}
 									className='bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-4 rounded-md flex items-center transition duration-300 ease-in-out'
 								>
 									<UserPlus className='mr-2' size={18} />
 									Sign Up
 								</Link>
 								<Link
-									to={'/login'}
+									to={'/sign-in'}
 									className='bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-md flex items-center transition duration-300 ease-in-out'
 								>
 									<LogIn className='mr-2' size={18} />

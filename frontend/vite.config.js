@@ -7,7 +7,7 @@ export default defineConfig({
 	server: {
 		proxy: {
 			"/api": {
-				target: "http://localhost:3000",
+				target: "http://localhost:3003",
 				changeOrigin: true,
 				secure: false, // allow self-signed or unverifiable certs in dev proxy
 				ws: true,

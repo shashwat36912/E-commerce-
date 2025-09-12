@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ShoppingCart, ChevronLeft, ChevronRight } from "lucide-react";
 import { useCartStore } from "../stores/useCartStore";
+import formatCurrency from "../lib/currency";
 
 const FeaturedProducts = ({ featuredProducts }) => {
 	const [currentIndex, setCurrentIndex] = useState(0);
@@ -55,7 +56,7 @@ const FeaturedProducts = ({ featuredProducts }) => {
 										<div className='p-4'>
 											<h3 className='text-lg font-semibold mb-2 text-white'>{product.name}</h3>
 											<p className='text-emerald-300 font-medium mb-4'>
-												${product.price.toFixed(2)}
+												{formatCurrency(product.price)}
 											</p>
 											<button
 												onClick={() => addToCart(product)}

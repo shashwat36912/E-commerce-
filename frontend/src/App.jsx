@@ -24,11 +24,15 @@ function App() {
 		checkAuth();
 	}, [checkAuth]);
 
+	// Fetch cart items after auth check settles. This allows viewing the cart
+	// even when the user is not signed in (e.g. guest cart persisted server-side
+	// or via cookies). We wait for `checkingAuth` to become false to avoid
+	// racing with `checkAuth()` on mount.
 	useEffect(() => {
-		if (!user) return;
+		if (checkingAuth) return;
 
 		getCartItems();
-	}, [getCartItems, user]);
+	}, [getCartItems, checkingAuth]);
 
 	if (checkingAuth) return <LoadingSpinner />;
 
@@ -44,21 +48,22 @@ function App() {
 			<div className='relative z-50 pt-20'>
 				<Navbar />
 				<Routes>
-					<Route path='/profile' element={user ? <ProfilePage /> : <Navigate to='/login' />} />
+					<Route path='/profile' element={user ? <ProfilePage /> : <Navigate to='/sign-in' />} />
 					<Route path='/' element={<HomePage />} />
-					<Route path='/signup' element={!user ? <SignUpPage /> : <Navigate to='/' />} />
-					<Route path='/login' element={!user ? <LoginPage /> : <Navigate to='/' />} />
+					<Route path='/sign-up' element={!user ? <SignUpPage /> : <Navigate to='/' />} />
+					<Route path='/sign-in' element={!user ? <LoginPage /> : <Navigate to='/' />} />
 					<Route
 						path='/secret-dashboard'
-						element={user?.role === "admin" ? <AdminPage /> : <Navigate to='/login' />}
+						element={(Boolean(user?.isAdmin) || user?.role === "admin") ? <AdminPage /> : <Navigate to='/sign-in' />}
 					/>
 					<Route path='/category/:category' element={<CategoryPage />} />
-					<Route path='/cart' element={user ? <CartPage /> : <Navigate to='/login' />} />
+					{/* Allow viewing cart even when not signed in (user can sign in at checkout) */}
+					<Route path='/cart' element={<CartPage />} />
 					<Route
 						path='/purchase-success'
-						element={user ? <PurchaseSuccessPage /> : <Navigate to='/login' />}
+						element={user ? <PurchaseSuccessPage /> : <Navigate to='/sign-in' />}
 					/>
-					<Route path='/purchase-cancel' element={user ? <PurchaseCancelPage /> : <Navigate to='/login' />} />
+					<Route path='/purchase-cancel' element={user ? <PurchaseCancelPage /> : <Navigate to='/sign-in' />} />
 				</Routes>
 			</div>
 			<Toaster />

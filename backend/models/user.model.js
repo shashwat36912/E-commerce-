@@ -3,6 +3,13 @@ import bcrypt from "bcryptjs";
 
 const userSchema = new mongoose.Schema(
 	{
+		clerkId: {
+			type: String,
+			index: true,
+			unique: true,
+			sparse: true,
+			description: "Clerk user id (if the user was created via Clerk)",
+		},
 		name: {
 			type: String,
 			required: [true, "Name is required"],
@@ -14,9 +21,9 @@ const userSchema = new mongoose.Schema(
 			lowercase: true,
 			trim: true,
 		},
+		// Keep password for backward compatibility but do not require it for Clerk users
 		password: {
 			type: String,
-			required: [true, "Password is required"],
 			minlength: [6, "Password must be at least 6 characters long"],
 		},
 		cartItems: [
@@ -36,6 +43,10 @@ const userSchema = new mongoose.Schema(
 			enum: ["customer", "admin"],
 			default: "customer",
 		},
+		isAdmin: {
+			type: Boolean,
+			default: false,
+		},
 	},
 	{
 		timestamps: true,
@@ -44,7 +55,8 @@ const userSchema = new mongoose.Schema(
 
 // Pre-save hook to hash password before saving to database
 userSchema.pre("save", async function (next) {
-	if (!this.isModified("password")) return next();
+	// If password is not set or not modified, skip hashing
+	if (!this.password || !this.isModified("password")) return next();
 
 	try {
 		const salt = await bcrypt.genSalt(10);

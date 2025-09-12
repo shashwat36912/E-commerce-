@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { Trash, Star, Edit, Loader, Upload } from "lucide-react";
 import { useProductStore } from "../stores/useProductStore";
+import formatCurrency from "../lib/currency";
 
 const ProductsList = () => {
 	const { deleteProduct, toggleFeaturedProduct, products, updateProduct } = useProductStore();
@@ -126,7 +127,7 @@ const ProductsList = () => {
 								</div>
 							</td>
 							<td className='px-6 py-4 whitespace-nowrap'>
-								<div className='text-sm text-gray-300'>${product.price.toFixed(2)}</div>
+								<div className='text-sm text-gray-300'>{formatCurrency(product.price)}</div>
 							</td>
 							<td className='px-6 py-4 whitespace-nowrap'>
 								<div className='text-sm text-gray-300'>{product.category}</div>

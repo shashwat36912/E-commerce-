@@ -2,6 +2,8 @@ import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import axios from "../lib/axios";
 import { Users, Package, ShoppingCart, DollarSign } from "lucide-react";
+import formatCurrency from "../lib/currency";
+import StatsPanel from "./StatsPanel";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
 const AnalyticsTab = () => {
@@ -13,6 +15,8 @@ const AnalyticsTab = () => {
 	});
 	const [isLoading, setIsLoading] = useState(true);
 	const [dailySalesData, setDailySalesData] = useState([]);
+	const [panelOpen, setPanelOpen] = useState(false);
+	const [panelType, setPanelType] = useState(null);
 
 	useEffect(() => {
 		const fetchAnalyticsData = async () => {
@@ -34,6 +38,12 @@ const AnalyticsTab = () => {
 		return <div>Loading...</div>;
 	}
 
+	const openPanel = (type) => {
+		setPanelType(type);
+		setPanelOpen(true);
+	};
+	const closePanel = () => setPanelOpen(false);
+
 	return (
 		<div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
 			<div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8'>
@@ -42,26 +52,30 @@ const AnalyticsTab = () => {
 					value={analyticsData.users.toLocaleString()}
 					icon={Users}
 					color='from-emerald-500 to-teal-700'
+					onClick={() => openPanel('users')}
 				/>
 				<AnalyticsCard
 					title='Total Products'
 					value={analyticsData.products.toLocaleString()}
 					icon={Package}
 					color='from-emerald-500 to-green-700'
+					onClick={() => openPanel('products')}
 				/>
 				<AnalyticsCard
 					title='Total Sales'
 					value={analyticsData.totalSales.toLocaleString()}
 					icon={ShoppingCart}
 					color='from-emerald-500 to-cyan-700'
+					onClick={() => openPanel('sales')}
 				/>
 				<AnalyticsCard
 					title='Total Revenue'
-					value={`$${analyticsData.totalRevenue.toLocaleString()}`}
+					value={formatCurrency(analyticsData.totalRevenue)}
 					icon={DollarSign}
 					color='from-emerald-500 to-lime-700'
 				/>
 			</div>
+			{panelOpen && <StatsPanel type={panelType} onClose={closePanel} />}
 			<motion.div
 				className='bg-gray-800/60 rounded-lg p-6 shadow-lg'
 				initial={{ opacity: 0, y: 20 }}
@@ -100,22 +114,24 @@ const AnalyticsTab = () => {
 };
 export default AnalyticsTab;
 
-const AnalyticsCard = ({ title, value, icon: Icon, color }) => (
-	<motion.div
-		className={`bg-gray-800 rounded-lg p-6 shadow-lg overflow-hidden relative ${color}`}
+const AnalyticsCard = ({ title, value, icon: Icon, color, onClick }) => (
+	<motion.button
+		onClick={onClick}
+		className={`bg-gray-800 rounded-lg p-6 shadow-lg overflow-hidden relative ${color} text-left cursor-pointer`}
 		initial={{ opacity: 0, y: 20 }}
 		animate={{ opacity: 1, y: 0 }}
 		transition={{ duration: 0.5 }}
 	>
 		<div className='flex justify-between items-center'>
 			<div className='z-10'>
-				<p className='text-emerald-300 text-sm mb-1 font-semibold'>{title}</p>
-				<h3 className='text-white text-3xl font-bold'>{value}</h3>
+				<p className='text-emerald-300 text-sm mb-1 font-semibold z-20'>{title}</p>
+				<h3 className='text-white text-3xl font-bold z-20'>{value}</h3>
 			</div>
 		</div>
-		<div className='absolute inset-0 bg-gradient-to-br from-emerald-600 to-emerald-900 opacity-30' />
-		<div className='absolute -bottom-4 -right-4 text-emerald-800 opacity-50'>
-			<Icon className='h-32 w-32' />
+		{/* Decorative gradient circle (non-blocking) */}
+		<div className='absolute -bottom-16 -right-10 w-36 h-36 rounded-full bg-gradient-to-br from-emerald-600 to-emerald-900 opacity-25 pointer-events-none' />
+		<div className='absolute -bottom-6 -right-6 text-emerald-800 opacity-30 pointer-events-none'>
+			<Icon className='h-20 w-20' />
 		</div>
-	</motion.div>
+	</motion.button>
 );

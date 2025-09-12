@@ -12,65 +12,132 @@ export const createCheckoutSession = async (req, res) => {
 
 		let totalAmount = 0;
 
-		const lineItems = products.map((product) => {
-			const amount = Math.round(product.price * 100); 
-			totalAmount += amount * product.quantity;
+		// Normalize and validate product prices and quantities. Convert to smallest currency unit (paise for INR).
+		const processedProducts = products.map((product, idx) => {
+			// Price may come as a number or formatted string (e.g., "₹1,234.00"). Strip non-numeric chars except dot and minus.
+			const rawPrice = product.price;
+			const priceNumber =
+				typeof rawPrice === "string"
+					? parseFloat(rawPrice.replace(/[^0-9.-]+/g, ""))
+					: Number(rawPrice);
+
+			if (!isFinite(priceNumber) || Number.isNaN(priceNumber)) {
+				const nameOrId = product.name || product._id || `index:${idx}`;
+				return { error: `Invalid price for product ${nameOrId}` };
+			}
+
+			const quantity = Number(product.quantity) || 1;
+			if (!Number.isFinite(quantity) || quantity <= 0) {
+				const nameOrId = product.name || product._id || `index:${idx}`;
+				return { error: `Invalid quantity for product ${nameOrId}` };
+			}
+
+			// Stripe expects integer in smallest currency unit. For INR, multiply by 100 (paise).
+			const unitAmount = Math.round(priceNumber * 100);
+			totalAmount += unitAmount * quantity;
 
 			return {
-				price_data: {
-					currency: "usd",
-					product_data: {
-						name: product.name,
-						images: [product.image],
-					},
-					unit_amount: amount,
-				},
-				quantity: product.quantity || 1,
+				...product,
+				priceNumber,
+				unitAmount,
+				quantity,
 			};
 		});
 
+		// If any product had an error, return 400 with details
+		const bad = processedProducts.find((p) => p && p.error);
+		if (bad) {
+			return res.status(400).json({ error: bad.error });
+		}
+
+		const lineItems = processedProducts.map((product) => ({
+			price_data: {
+				currency: "inr",
+				product_data: {
+					name: product.name,
+					images: [product.image],
+				},
+				unit_amount: product.unitAmount,
+			},
+			quantity: product.quantity || 1,
+		}));
+
+		// If a coupon code was provided, look it up and compute the expected
+		// final amount (paise) after applying the coupon percentage. We do
+		// NOT mutate `totalAmount` here because Stripe will apply the
+		// discount via the `discounts` property below; instead compute
+		// `finalAmount` for validation (minimum order) and later use Stripe
+		// discounts so the session's `amount_total` matches expectations.
 		let coupon = null;
+		let finalAmount = totalAmount;
 		if (couponCode) {
 			coupon = await Coupon.findOne({ code: couponCode, userId: req.user._id, isActive: true });
 			if (coupon) {
-				totalAmount -= Math.round((totalAmount * coupon.discountPercentage) / 100);
+				const discountPaise = Math.round((totalAmount * coupon.discountPercentage) / 100);
+				finalAmount = totalAmount - discountPaise;
 			}
 		}
 
-		const session = await stripe.checkout.sessions.create({
-			payment_method_types: ["card"],
-			line_items: lineItems,
-			mode: "payment",
-			success_url: `${process.env.CLIENT_URL}/purchase-success?session_id={CHECKOUT_SESSION_ID}`,
-			cancel_url: `${process.env.CLIENT_URL}/purchase-cancel`,
-			discounts: coupon
-				? [
+		// Enforce a minimum order amount to satisfy Stripe's minimum (in smallest currency unit, paise)
+		// Default raised to 5000 paise (₹50) to avoid Stripe `amount_too_small` errors for INR payments.
+		const MIN_ORDER_PAISE = Number(process.env.MIN_ORDER_PAISE || 5000); // default 5000 paise = ₹50
+		if (finalAmount < MIN_ORDER_PAISE) {
+			const human = (finalAmount / 100).toFixed(2);
+			return res.status(400).json({ message: `Order total after discounts ₹${human} is below the minimum order amount. Please add more items to proceed.` });
+		}
+
+		let session;
+		// Resolve client URL with safe fallback for local development.
+		// Declare outside the try block so it's available for later logging even if
+		// the create() call throws and we still want to report the intended URL.
+		const clientUrl = process.env.CLIENT_URL || process.env.VITE_CLIENT_URL || "http://localhost:5173";
+
+		try {
+			session = await stripe.checkout.sessions.create({
+				payment_method_types: ["card"],
+				line_items: lineItems,
+				mode: "payment",
+				success_url: `${clientUrl}/purchase-success?session_id={CHECKOUT_SESSION_ID}`,
+				cancel_url: `${clientUrl}/purchase-cancel`,
+				discounts: coupon
+					? [
 						{
 							coupon: await createStripeCoupon(coupon.discountPercentage),
 						},
-				  ]
-				: [],
-			metadata: {
-				userId: req.user._id.toString(),
-				couponCode: couponCode || "",
-				products: JSON.stringify(
-					products.map((p) => ({
-						id: p._id,
-						quantity: p.quantity,
-						price: p.price,
-					}))
-				),
-			},
-		});
+					]
+					: [],
+				metadata: {
+					userId: req.user._id.toString(),
+					couponCode: couponCode || "",
+					// store id, quantity and numeric price (in main currency units) for later order creation
+					products: JSON.stringify(
+						processedProducts.map((p) => ({
+							id: p._id,
+							quantity: p.quantity,
+							price: p.priceNumber,
+						}))
+					),
+				},
+			});
+		} catch (err) {
+			// Provide a friendly error for small amounts or bubble up otherwise
+			if (err && err.code === "amount_too_small") {
+				console.warn("Stripe amount_too_small:", err.raw?.message || err.message);
+				return res.status(400).json({ message: err.raw?.message || "Total amount too small for checkout" });
+			}
+			// rethrow other errors to be handled by outer catch
+			throw err;
+		}
 
 		// Debug: log the redirect URL used for this checkout session
 		try {
-			const successUrl = `${process.env.CLIENT_URL}/purchase-success?session_id={CHECKOUT_SESSION_ID}`;
+			const successUrl = `${clientUrl}/purchase-success?session_id={CHECKOUT_SESSION_ID}`;
 			console.log("[checkout] success_url:", successUrl);
 		} catch (e) {
 			console.warn("[checkout] failed to log success_url", e);
 		}
 
+		// totalAmount currently in smallest currency unit (paise). Create coupon if total >= 20000 paise (i.e., ₹200)
 		if (totalAmount >= 20000) {
 			await createNewCoupon(req.user._id);
 		}
@@ -78,6 +145,17 @@ export const createCheckoutSession = async (req, res) => {
 	} catch (error) {
 		console.error("Error processing checkout:", error);
 		res.status(500).json({ message: "Error processing checkout", error: error.message });
+	}
+};
+
+// Return payment-related config to clients (e.g. minimum order amount)
+export const getPaymentConfig = async (req, res) => {
+	try {
+		const MIN_ORDER_PAISE = Number(process.env.MIN_ORDER_PAISE || 5000);
+		return res.status(200).json({ minOrderPaise: MIN_ORDER_PAISE });
+	} catch (err) {
+		console.error("Failed to return payment config", err);
+		return res.status(500).json({ message: "Failed to return payment config" });
 	}
 };
 
@@ -143,7 +221,7 @@ export const checkoutSuccess = async (req, res) => {
 					quantity: product.quantity,
 					price: product.price,
 				})),
-				totalAmount: session.amount_total / 100, // convert from cents to dollars,
+				totalAmount: session.amount_total / 100, // convert from smallest currency unit (paise) to main unit (INR)
 				stripeSessionId: sessionId,
 			};
 
