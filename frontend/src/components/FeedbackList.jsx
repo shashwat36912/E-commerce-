@@ -37,7 +37,6 @@ export default function FeedbackList({ productId }) {
     try {
       await axios.delete(`/feedbacks/${id}`);
       toast.success('Feedback deleted');
-      // refresh list
       const res = await axios.get(`/feedbacks/product/${productId}`);
       setFeedbacks(res.data.feedbacks || []);
     } catch (err) {
@@ -46,30 +45,47 @@ export default function FeedbackList({ productId }) {
     }
   };
 
-  if (loading) return <div>Loading feedbacks...</div>;
-  if (!feedbacks.length) return <div>No feedback yet. Be the first to comment!</div>;
+  if (loading) return <div className="text-gray-300">Loading feedbacks...</div>;
+  if (!feedbacks.length) return <div className="text-gray-400">No feedback yet. Be the first to comment!</div>;
 
   return (
-    <div className='space-y-4'>
-      {feedbacks.map((f) => (
-        <div key={f._id} className='bg-gray-800 p-4 rounded'>
-          <div className='flex items-center justify-between'>
-            <strong>{f.author?.name || f.userName}</strong>
-            <div className='flex items-center gap-3'>
-              <span className='text-amber-300'>{f.rating} / 5</span>
-              {(() => {
-                const authorId = f.author?._id || f.author || f.author?._id?.toString();
-                const currentUserId = user?._id || user?.id || user?._id?.toString();
-                return ((authorId && String(authorId) === String(currentUserId)) || isAdmin) ? (
-                  <button onClick={() => deleteFeedback(f._id)} className='text-red-400 hover:underline'>Delete</button>
-                ) : null;
-              })()}
+    <div className="space-y-6">
+      {feedbacks.map((f) => {
+        const authorId = f.author?._id || f.author || f.author?._id?.toString();
+        const currentUserId = user?._id || user?.id || user?._id?.toString();
+        const canDelete = (authorId && String(authorId) === String(currentUserId)) || isAdmin;
+
+        return (
+          <div
+            key={f._id}
+            className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-6 shadow-xl
+                       border border-slate-700/50 transition transform duration-300
+                       hover:-translate-y-1 hover:shadow-emerald-500/30 hover:border-emerald-400/40"
+          >
+            <div className="flex items-center justify-between">
+              <strong className="text-emerald-300 font-semibold tracking-wide">
+                {f.author?.name || f.userName}
+              </strong>
+              <div className="flex items-center gap-4">
+                <span className="text-amber-300 font-medium">{f.rating} / 5</span>
+                {canDelete && (
+                  <button
+                    onClick={() => deleteFeedback(f._id)}
+                    className="text-red-400 hover:text-red-300 hover:underline
+                               transition-colors duration-200"
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
             </div>
+            <p className="mt-3 text-slate-200 leading-relaxed">{f.comment}</p>
+            <small className="block mt-2 text-slate-400 text-xs">
+              {new Date(f.createdAt).toLocaleString()}
+            </small>
           </div>
-          <p className='mt-2'>{f.comment}</p>
-          <small className='text-gray-400'>{new Date(f.createdAt).toLocaleString()}</small>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

@@ -8,6 +8,7 @@ import CategoryPage from "./pages/CategoryPage";
 import ProfilePage from "./pages/ProfilePage";
 import MoreDetails from "./pages/MoreDetails";
 
+
 import Navbar from "./components/Navbar";
 import { Toaster } from "react-hot-toast";
 import { useUserStore } from "./stores/useUserStore";
