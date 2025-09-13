@@ -5,10 +5,17 @@ import Order from "../models/order.model.js";
 const router = express.Router();
 
 // GET /api/orders - list orders (admin only)
+// Optional query param: productId to filter orders containing a specific product
 router.get("/", protectRoute, adminRoute, async (req, res) => {
   try {
-    const orders = await Order.find()
+    const filter = {};
+    if (req.query.productId) {
+      filter['products.product'] = req.query.productId;
+    }
+
+    const orders = await Order.find(filter)
       .populate({ path: "products.product", model: "Product", select: "name" })
+      .populate({ path: "user", model: "User", select: "name email" })
       .sort({ createdAt: -1 });
 
     // Simplify order items for API clients
@@ -16,6 +23,7 @@ router.get("/", protectRoute, adminRoute, async (req, res) => {
       _id: o._id,
       totalAmount: o.totalAmount,
       createdAt: o.createdAt,
+      user: o.user ? { _id: o.user._id, name: o.user.name, email: o.user.email } : null,
       items: o.products.map((p) => ({
         productId: p.product?._id,
         name: p.product?.name || null,

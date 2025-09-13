@@ -26,6 +26,12 @@ const AnalyticsTab = () => {
 				setDailySalesData(response.data.dailySalesData);
 			} catch (error) {
 				console.error("Error fetching analytics data:", error);
+				if (error?.response?.status === 401 || error?.response?.status === 403) {
+					setAnalyticsData({ users: 0, products: 0, totalSales: 0, totalRevenue: 0 });
+					setDailySalesData([]);
+					setIsLoading(false);
+					return;
+				}
 			} finally {
 				setIsLoading(false);
 			}
@@ -43,6 +49,24 @@ const AnalyticsTab = () => {
 		setPanelOpen(true);
 	};
 	const closePanel = () => setPanelOpen(false);
+
+	// derive a small revenue series for the sparkline (last 12 points)
+	const revenueSeries = (dailySalesData || []).slice(-12).map((d) => d.revenue || 0);
+
+	const buildSparkPath = (values, width = 120, height = 30) => {
+		if (!values || values.length === 0) return '';
+		const max = Math.max(...values);
+		const min = Math.min(...values);
+		const range = max - min || 1;
+		const step = width / (values.length - 1 || 1);
+		return values
+			.map((v, i) => {
+				const x = i * step;
+				const y = height - ((v - min) / range) * height;
+				return `${i === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
+			})
+			.join(' ');
+	};
 
 	return (
 		<div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
@@ -73,6 +97,8 @@ const AnalyticsTab = () => {
 					value={formatCurrency(analyticsData.totalRevenue)}
 					icon={DollarSign}
 					color='from-emerald-500 to-lime-700'
+					sparkPath={buildSparkPath(revenueSeries)}
+					onClick={() => openPanel('sales')}
 				/>
 			</div>
 			{panelOpen && <StatsPanel type={panelType} onClose={closePanel} />}
@@ -114,7 +140,7 @@ const AnalyticsTab = () => {
 };
 export default AnalyticsTab;
 
-const AnalyticsCard = ({ title, value, icon: Icon, color, onClick }) => (
+const AnalyticsCard = ({ title, value, icon: Icon, color, onClick, sparkPath }) => (
 	<motion.button
 		onClick={onClick}
 		className={`bg-gray-800 rounded-lg p-6 shadow-lg overflow-hidden relative ${color} text-left cursor-pointer`}
@@ -126,6 +152,13 @@ const AnalyticsCard = ({ title, value, icon: Icon, color, onClick }) => (
 			<div className='z-10'>
 				<p className='text-emerald-300 text-sm mb-1 font-semibold z-20'>{title}</p>
 				<h3 className='text-white text-3xl font-bold z-20'>{value}</h3>
+				{sparkPath && (
+					<div className='mt-2'>
+						<svg width='120' height='30' viewBox={`0 0 120 30`} className='block' preserveAspectRatio='none'>
+							<path d={sparkPath} fill='none' stroke='#60A5FA' strokeWidth='2' strokeLinejoin='round' strokeLinecap='round' />
+						</svg>
+					</div>
+				)}
 			</div>
 		</div>
 		{/* Decorative gradient circle (non-blocking) */}

@@ -11,3 +11,176 @@
 .pl-6 {
   padding-left: 1.5rem; /* 24px */
 }
+
+:root{
+  --color-bg: #0b1220;
+  --color-surface: #0f1724;
+  --color-primary: #0f766e;
+  --color-primary-600: #0f766e;
+  --color-muted: #94a3b8;
+}
+
+@layer base {
+  html,body,#root{
+    height:100%;
+    background: linear-gradient(180deg, rgba(11,18,32,1) 0%, rgba(8,15,24,1) 60%);
+    color: #e6eef0;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  }
+
+  a {
+    color: inherit;
+  }
+
+  /* Make cards use the surface color */
+  .card-surface {
+    background-color: var(--color-surface);
+    border: 1px solid rgba(255,255,255,0.04);
+    box-shadow: 0 10px 30px rgba(2,6,23,0.6);
+  }
+}
+
+@layer components {
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.5rem; /* rounded-lg */
+    padding: 0.5rem 1rem; /* py-2 px-4 */
+    font-size: 0.875rem; /* text-sm */
+    font-weight: 600;
+    color: #fff;
+    background-color: var(--color-primary);
+    transition: background-color .18s ease, transform .12s ease;
+  }
+  .btn-primary:hover{
+    background-color: rgba(11,118,110,0.9);
+    transform: translateY(-1px);
+  }
+
+  .muted {
+    color: var(--color-muted);
+  }
+}
+
+/* Additional UI utilities for admin panel, tables, and buttons */
+@layer components {
+  .btn-ghost {
+    background: transparent;
+    color: inherit;
+    padding: 0.375rem 0.6rem;
+    border-radius: 0.375rem;
+    border: 1px solid transparent;
+  }
+
+  .btn-danger {
+    background: rgba(220,38,38,0.06);
+    color: #f87171; /* red-400 */
+    padding: 0.375rem 0.6rem;
+    border-radius: 0.375rem;
+    border: 1px solid rgba(248,113,113,0.08);
+  }
+
+  /* Table styles */
+  .table-root {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+    min-width: 600px;
+  }
+
+  .table-root thead th {
+    text-align: left;
+    padding: 0.75rem 1rem;
+    color: var(--color-muted);
+    font-size: 0.8rem;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+
+  .table-root tbody td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid rgba(255,255,255,0.02);
+  }
+
+  .table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Admin list row */
+  .admin-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.9rem;
+    border-radius: 0.625rem;
+    transition: background-color .12s ease, transform .08s ease;
+  }
+
+  .admin-row:hover {
+    background: rgba(255,255,255,0.02);
+    transform: translateY(-1px);
+  }
+
+  .avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 9999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    background: linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+    border: 1px solid rgba(255,255,255,0.04);
+    color: #e6eef0;
+  }
+
+  .admin-meta {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .muted-sm { color: var(--color-muted); font-size: 0.85rem; }
+
+  /* Accessible focus ring */
+  .focus-ring:focus {
+    outline: 3px solid rgba(15,118,110,0.16);
+    outline-offset: 2px;
+  }
+
+  /* small helpers */
+  .chip {
+    padding: 0.18rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.02);
+  }
+}
+
+@layer utilities {
+  .text-ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+/* Auth pages and Clerk widget tweaks */
+@layer components {
+  .auth-card {
+    background: linear-gradient(180deg, rgba(10,20,30,0.6), rgba(8,12,18,0.6));
+    border-radius: 1rem;
+    padding: 1.25rem;
+    border: 1px solid rgba(255,255,255,0.03);
+  }
+
+  .clerk-container :global(.clerk-modal), .clerk-container :global(.clerk-card) {
+    background: rgba(6,8,15,0.9) !important;
+    border-radius: 12px !important;
+    color: #e6eef0 !important;
+  }
+
+  /* Form spacing helpers */
+  .auth-header h2 { margin: 0; }
+}

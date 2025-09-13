@@ -15,4 +15,35 @@ router.get("/users", protectRoute, adminRoute, async (req, res) => {
   }
 });
 
+// PUT /api/admin/users/:id - update user (admin only)
+router.put("/users/:id", protectRoute, adminRoute, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = {};
+    if (req.body.hasOwnProperty("name")) updates.name = req.body.name;
+    if (req.body.hasOwnProperty("role")) updates.role = req.body.role;
+    if (req.body.hasOwnProperty("isAdmin")) updates.isAdmin = Boolean(req.body.isAdmin);
+
+    const user = await User.findByIdAndUpdate(id, updates, { new: true }).select("_id name email isAdmin role createdAt");
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.json({ user });
+  } catch (err) {
+    console.error("Error updating user", err.message || err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// DELETE /api/admin/users/:id - delete user (admin only)
+router.delete("/users/:id", protectRoute, adminRoute, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findByIdAndDelete(id).select("_id name email");
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.json({ message: "User deleted", user });
+  } catch (err) {
+    console.error("Error deleting user", err.message || err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 export default router;
