@@ -156,53 +156,79 @@ export const toggleFeaturedProduct = async (req, res) => {
 };
 
 export const updateProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description, price, image, category, autoGenerate } = req.body;
 
-	try {
-		const { id } = req.params;
-		const { name, description, price, image, category } = req.body;
+    const product = await Product.findById(id);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
 
-		const product = await Product.findById(id);
+    let cloudinaryResponse = null;
 
-		if (!product) {
-			return res.status(404).json({ message: 'Product not found' });
-		}
+    // अगर नई image आई है
+    if (image && image !== product.image) {
+      // नई image upload
+      cloudinaryResponse = await cloudinary.uploader.upload(image, { folder: "products" });
 
-		let cloudinaryResponse = null;
+      // पुरानी image delete करने की कोशिश
+      if (product.image) {
+        try {
+          const publicId = product.image.split("/").pop().split(".")[0];
+          await cloudinary.uploader.destroy(`products/${publicId}`);
+        } catch (err) {
+          console.log("Error deleting old image from Cloudinary", err.message);
+        }
+      }
+    }
 
-		// If a new image (base64) is provided, upload it and remove old image
-		if (image) {
-			// upload new image
-			cloudinaryResponse = await cloudinary.uploader.upload(image, { folder: 'products' });
+    // Fields update
+    if (name !== undefined) product.name = name;
+    if (description !== undefined) product.description = description;
+    if (price !== undefined) product.price = price;
+    if (category !== undefined) product.category = category;
+    if (cloudinaryResponse && cloudinaryResponse.secure_url) {
+      product.image = cloudinaryResponse.secure_url;
 
-			// try to delete old image if exists
-			if (product.image) {
-				try {
-					const publicId = product.image.split('/').pop().split('.')[0];
-					await cloudinary.uploader.destroy(`products/${publicId}`);
-				} catch (err) {
-					console.log('Error deleting old image from cloudinary', err.message);
-				}
-			}
-		}
+      // ✅ अगर autoGenerate true है → AI से नया name + description लाएँ
+      if (autoGenerate) {
+        try {
+					const aiText = await generateProductDetails(product.image);
+					console.log("AI raw output (updateProduct):", aiText);
+					const lines = aiText.split("\n").map(l => l.trim()).filter(l => l !== "");
+					console.log("AI parsed lines (updateProduct):", lines);
+					const aiNameLine = lines.find(l => l.toLowerCase().startsWith("name:"));
+					const aiDescLine = lines.find(l => l.toLowerCase().startsWith("description:"));
+					const aiCategoryLine = lines.find(l => l.toLowerCase().startsWith("category:"));
+					product.name = aiNameLine ? aiNameLine.replace(/name:/i, "").trim() : product.name;
+					product.description = aiDescLine ? aiDescLine.replace(/description:/i, "").trim() : product.description;
+					if (aiCategoryLine) {
+						const suggested = aiCategoryLine.replace(/category:/i, "").trim().toLowerCase();
+						const allowed = ["jeans", "t-shirts", "shoes", "glasses", "jackets", "suits", "bags"];
+						if (allowed.includes(suggested)) {
+							product.category = suggested;
+						} else {
+							console.log("AI suggested category not in allowed list:", suggested);
+						}
+					}
+					console.log("Final product name/description/category after AI (updateProduct):", product.name, product.description, product.category);
+        } catch (err) {
+          console.log("AI generation failed:", err.message);
+        }
+      }
+    }
 
-		// update fields if provided
-		if (name !== undefined) product.name = name;
-		if (description !== undefined) product.description = description;
-		if (price !== undefined) product.price = price;
-		if (category !== undefined) product.category = category;
-		if (cloudinaryResponse && cloudinaryResponse.secure_url) product.image = cloudinaryResponse.secure_url;
+    const updated = await product.save();
+    await updateFeaturedProductsCache();
 
-		const updated = await product.save();
-
-		// refresh featured products cache in case featured flag changed elsewhere
-		await updateFeaturedProductsCache();
-
-		res.json(updated);
-	} catch (error) {
-		console.log('Error in updateProduct controller', error.message);
-		res.status(500).json({ message: 'Server error', error: error.message });
-	}
+    res.json(updated);
+  } catch (error) {
+    console.log("Error in updateProduct controller", error.message);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
 };
+
 
 async function updateFeaturedProductsCache() {
 	try {
@@ -214,3 +240,35 @@ async function updateFeaturedProductsCache() {
 		console.log("error in update cache function");
 	}
 }
+
+
+import { generateProductDetails } from "../lib/ai.js";
+
+// New AI Auto-generate controller
+export const autoGenerateProductDetails = async (req, res) => {
+  try {
+    const { image } = req.body;
+    if (!image) return res.status(400).json({ message: "Image URL required" });
+
+	const aiText = await generateProductDetails(image);
+
+	const lines = aiText.split("\n").map(l => l.trim()).filter(l => l !== "");
+	const aiNameLine = lines.find(l => l.toLowerCase().startsWith("name:"));
+	const aiDescLine = lines.find(l => l.toLowerCase().startsWith("description:"));
+	const aiCategoryLine = lines.find(l => l.toLowerCase().startsWith("category:"));
+	const name = aiNameLine ? aiNameLine.replace(/name:/i, "").trim() : "";
+	const description = aiDescLine ? aiDescLine.replace(/description:/i, "").trim() : "";
+	const category = aiCategoryLine ? aiCategoryLine.replace(/category:/i, "").trim().toLowerCase() : "";
+
+	// Validate category against allowed list
+	const allowed = ["jeans", "t-shirts", "shoes", "glasses", "jackets", "suits", "bags"];
+	const validCategory = allowed.includes(category) ? category : "";
+
+	// Return parsed fields and raw AI text for debugging on frontend
+	res.json({ name, description, category: validCategory, raw: aiText });
+  } catch (error) {
+
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+

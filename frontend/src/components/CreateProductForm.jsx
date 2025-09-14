@@ -1,7 +1,6 @@
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { PlusCircle, Upload, Loader } from "lucide-react";
-import { useProductStore } from "../stores/useProductStore";
 
 const categories = ["jeans", "t-shirts", "shoes", "glasses", "jackets", "suits", "bags"];
 
@@ -13,33 +12,103 @@ const CreateProductForm = () => {
     category: "",
     image: "",
   });
+  const [loading, setLoading] = useState(false);
 
-  const { createProduct, loading } = useProductStore();
+  useEffect(() => {
+    console.log("newProduct state changed:", newProduct);
+  }, [newProduct]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+ 
+  const handleImageChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setLoading(true);
     try {
-      await createProduct(newProduct);
-      setNewProduct({ name: "", description: "", price: "", category: "", image: "" });
-    } catch {
-      console.log("error creating a product");
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/products/upload", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Upload failed");
+
+      const imageUrl = data.secure_url;
+      setNewProduct((prev) => ({ ...prev, image: imageUrl }));
+
+      // Optional: auto-generate name & description
+      try {
+        const aiRes = await fetch("/api/products/auto-generate", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: imageUrl }),
+        });
+        if (aiRes.ok) {
+          const aiData = await aiRes.json();
+          console.log("AI suggestion category:", aiData.category);
+          setNewProduct((prev) => ({
+            ...prev,
+            name: aiData.name || prev.name,
+            description: aiData.description || prev.description,
+            category: aiData.category || prev.category,
+          }));
+        }
+      } catch (aiErr) {
+        console.warn("AI auto-generate failed:", aiErr.message);
+      }
+    } catch (err) {
+      console.error("Error uploading image:", err);
+      alert("Image upload failed: " + err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setNewProduct({ ...newProduct, image: reader.result });
-      };
-      reader.readAsDataURL(file);
+  const handleChange = (e) =>
+    setNewProduct({ ...newProduct, [e.target.name]: e.target.value });
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (
+      !newProduct.name ||
+      !newProduct.description ||
+      !newProduct.price ||
+      !newProduct.category ||
+      !newProduct.image
+    ) {
+      alert("Please fill all fields and upload an image.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newProduct),
+      });
+      const data = await res.json();
+      console.log("Product created:", data);
+      alert("✅ Product created successfully!");
+      setNewProduct({
+        name: "",
+        description: "",
+        price: "",
+        category: "",
+        image: "",
+      });
+    } catch (err) {
+      console.error("Error creating product:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <motion.div
-      className="bg-gradient-to-br from-slate-800 to-slate-900 shadow-2xl rounded-2xl p-8 mb-10 max-w-xl mx-auto 
+      className="bg-gradient-to-br from-slate-800 to-slate-900 shadow-2xl rounded-2xl p-8 max-w-xl mx-auto 
                  border border-slate-700/50 hover:shadow-emerald-500/20 transition-all duration-300"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -49,18 +118,25 @@ const CreateProductForm = () => {
         Create New Product
       </h2>
 
+      {/* Preview */}
+      {newProduct.image && (
+        <img
+          src={newProduct.image}
+          alt="Preview"
+          className="w-full h-48 object-cover rounded-lg border border-slate-700 mb-6"
+        />
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Name */}
         <div>
-          <label htmlFor="name" className="block text-sm font-semibold text-slate-300 mb-1">
-            Product Name
-          </label>
+          <label className="block text-sm font-semibold text-slate-300 mb-1">Name</label>
           <input
             type="text"
-            id="name"
+            name="name"
             value={newProduct.name}
-            onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-            className="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 
+            onChange={handleChange}
+            className="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 text-slate-200
                        placeholder-slate-400 focus:outline-none focus:border-emerald-400
                        focus:ring-1 focus:ring-emerald-400 transition-colors duration-200"
             required
@@ -69,15 +145,13 @@ const CreateProductForm = () => {
 
         {/* Description */}
         <div>
-          <label htmlFor="description" className="block text-sm font-semibold text-slate-300 mb-1">
-            Description
-          </label>
+          <label className="block text-sm font-semibold text-slate-300 mb-1">Description</label>
           <textarea
-            id="description"
-            rows="3"
+            name="description"
+            rows={3}
             value={newProduct.description}
-            onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
-            className="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 
+            onChange={handleChange}
+            className="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 text-slate-200
                        placeholder-slate-400 focus:outline-none focus:border-emerald-400
                        focus:ring-1 focus:ring-emerald-400 transition-colors duration-200"
             required
@@ -86,16 +160,13 @@ const CreateProductForm = () => {
 
         {/* Price */}
         <div>
-          <label htmlFor="price" className="block text-sm font-semibold text-slate-300 mb-1">
-            Price
-          </label>
+          <label className="block text-sm font-semibold text-slate-300 mb-1">Price</label>
           <input
             type="number"
-            id="price"
-            step="0.01"
+            name="price"
             value={newProduct.price}
-            onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
-            className="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 
+            onChange={handleChange}
+            className="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 text-slate-200
                        placeholder-slate-400 focus:outline-none focus:border-emerald-400
                        focus:ring-1 focus:ring-emerald-400 transition-colors duration-200"
             required
@@ -104,22 +175,20 @@ const CreateProductForm = () => {
 
         {/* Category */}
         <div>
-          <label htmlFor="category" className="block text-sm font-semibold text-slate-300 mb-1">
-            Category
-          </label>
+          <label className="block text-sm font-semibold text-slate-300 mb-1">Category</label>
           <select
-            id="category"
+            name="category"
             value={newProduct.category}
-            onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
+            onChange={handleChange}
             className="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 text-slate-200
                        focus:outline-none focus:border-emerald-400 focus:ring-1
                        focus:ring-emerald-400 transition-colors duration-200"
             required
           >
             <option value="">Select a category</option>
-            {categories.map((category) => (
-              <option key={category} value={category}>
-                {category}
+            {categories.map((c) => (
+              <option key={c} value={c}>
+                {c}
               </option>
             ))}
           </select>
@@ -176,3 +245,4 @@ const CreateProductForm = () => {
 };
 
 export default CreateProductForm;
+

@@ -1,4 +1,11 @@
 import gemini from '../lib/gemini.js';
+import cloudinary from '../lib/cloudinary.js';
+import axios from 'axios';
+
+function capitalizeFirstLetter(s) {
+  if (!s) return '';
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
 import Product from '../models/product.model.js';
 import Feedback from '../models/feedback.model.js';
 
@@ -214,3 +221,4 @@ export const recommendProducts = async (req, res) => {
     res.status(500).json({ message: 'AI service error', error: error.message });
   }
 };
+
